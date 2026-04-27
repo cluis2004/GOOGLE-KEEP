@@ -1,4 +1,4 @@
-import { Controller, Param, ParseIntPipe, Post, Get, Res, UploadedFile, UseInterceptors } from "@nestjs/common";
+import { Controller, Param, ParseIntPipe, Post, Get, Res, UploadedFile, UseInterceptors, Query } from "@nestjs/common";
 import { AttachmentService } from "./attachment.service";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { memoryStorage } from "multer";
@@ -20,8 +20,10 @@ export class AttachmentController {
     @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
     async saveFile(
         @UploadedFile() file: Express.Multer.File,
-        @Param('id', ParseIntPipe) id: number) {
-        return await this.service.save(file, id);
+        @Param('id', ParseIntPipe) id: number,
+        @Query('userId') userId?: string) {
+        const uId = userId ? parseInt(userId, 10) : undefined;
+        return await this.service.save(file, id, uId);
     }
 
     @Get('view/:id')
@@ -35,7 +37,8 @@ export class AttachmentController {
     }
 
     @Post('delete/:id')
-    async deleteFile(@Param('id', ParseIntPipe) id: number) {
-        return await this.service.delete(id);
+    async deleteFile(@Param('id', ParseIntPipe) id: number, @Query('userId') userId?: string) {
+        const uId = userId ? parseInt(userId, 10) : undefined;
+        return await this.service.delete(id, uId);
     }
 }

@@ -1,90 +1,113 @@
-    <div class="share-backdrop" (click)="close.emit()">
-        <div class="share-modal" (click)="$event.stopPropagation()">
+<div class="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm transition-opacity duration-200" (click)="close.emit()">
+    <div class="w-full max-w-lg bg-surface-0 dark:bg-surface-900 rounded-2xl shadow-2xl overflow-hidden transform transition-all duration-200 scale-100" (click)="$event.stopPropagation()">
 
-            <!-- Header -->
-            <div class="share-modal__header">
-                <div class="share-modal__icon">
-                    <i class="pi pi-share-alt"></i>
+        <!-- Header -->
+        <div class="flex items-center gap-4 px-6 py-5 border-b border-surface-200 dark:border-surface-700">
+            <div class="w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-br from-yellow-400 to-yellow-600 text-white shadow-sm flex-shrink-0">
+                <i class="pi pi-share-alt text-lg"></i>
+            </div>
+            <div class="flex-1">
+                <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0 m-0 leading-tight">Compartir nota</h2>
+                <p class="text-sm text-surface-500 dark:text-surface-400 m-0">Gestiona quién puede ver o editar esta nota</p>
+            </div>
+            <button type="button" class="w-8 h-8 rounded-full flex items-center justify-center text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors" (click)="close.emit()">
+                <i class="pi pi-times"></i>
+            </button>
+        </div>
+
+        <!-- Add collaborator (Only for owner) -->
+        <div *ngIf="isOwner" class="p-5 border-b border-surface-100 dark:border-surface-800 bg-surface-50 dark:bg-surface-800/50">
+            <div class="flex gap-2 items-center">
+                <div class="relative flex-1">
+                    <i class="pi pi-envelope absolute left-3 top-1/2 -translate-y-1/2 text-surface-400"></i>
+                    <input
+                        type="email"
+                        [(ngModel)]="emailInput"
+                        placeholder="Agregar por correo electrónico"
+                        class="w-full py-2.5 pl-9 pr-3 rounded-xl border border-surface-300 dark:border-surface-600 bg-surface-0 dark:bg-surface-900 text-surface-900 dark:text-surface-0 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 transition-all disabled:opacity-60"
+                        (keyup.enter)="addCollaborator()"
+                        [disabled]="adding()"
+                    />
                 </div>
-                <div>
-                    <h2 class="share-modal__title">Compartir nota</h2>
-                    <p class="share-modal__subtitle">Gestiona quién puede ver o editar esta nota</p>
-                </div>
-                <button class="share-modal__close" (click)="close.emit()">
-                    <i class="pi pi-times"></i>
+                <select [(ngModel)]="selectedRole" class="py-2.5 px-2 rounded-xl border border-surface-300 dark:border-surface-600 bg-surface-0 dark:bg-surface-900 text-surface-700 dark:text-surface-300 text-sm outline-none cursor-pointer focus:border-yellow-500 transition-colors">
+                    <option [value]="2">Editor</option>
+                    <option [value]="3">Lector</option>
+                </select>
+                <button 
+                    class="w-10 h-10 rounded-full border-none bg-gradient-to-br from-yellow-400 to-yellow-600 text-white cursor-pointer flex items-center justify-center flex-shrink-0 transition-transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-md" 
+                    (click)="addCollaborator()" 
+                    [disabled]="adding() || !emailInput.trim()"
+                >
+                    <i class="pi pi-plus" *ngIf="!adding()"></i>
+                    <i class="pi pi-spinner pi-spin" *ngIf="adding()"></i>
                 </button>
             </div>
+            <p class="text-xs text-red-500 mt-2 mb-0" *ngIf="addError()">{{ addError() }}</p>
+        </div>
 
-            <!-- Add collaborator -->
-            <div class="share-modal__add">
-                <div class="share-modal__input-row">
-                    <div class="share-modal__input-wrap">
-                        <i class="pi pi-envelope share-modal__input-icon"></i>
-                        <input
-                            type="email"
-                            [(ngModel)]="emailInput"
-                            placeholder="Agregar por correo electrónico"
-                            class="share-modal__input"
-                            (keyup.enter)="addCollaborator()"
-                            [disabled]="adding()"
-                        />
+        <!-- Collaborator list -->
+        <div class="max-h-64 overflow-y-auto p-2">
+            <!-- Loading state -->
+            <div *ngIf="loading()" class="flex flex-col items-center justify-center py-8 text-surface-400 gap-2">
+                <i class="pi pi-spinner pi-spin text-2xl"></i>
+                <span class="text-sm">Cargando colaboradores...</span>
+            </div>
+
+            <!-- Empty state -->
+            <div *ngIf="!loading() && collaborators().length === 0" class="flex flex-col items-center justify-center py-8 text-surface-400 gap-2">
+                <i class="pi pi-users text-4xl opacity-40"></i>
+                <p class="text-sm m-0">Solo tú tienes acceso a esta nota</p>
+            </div>
+
+            <!-- List items -->
+            <div *ngFor="let c of collaborators()" class="flex items-center gap-3 p-3 hover:bg-surface-50 dark:hover:bg-surface-800/50 rounded-xl transition-colors group">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0 shadow-sm" [style.background]="avatarColor(c.usuario.name)">
+                    {{ c.usuario.name ? c.usuario.name.charAt(0).toUpperCase() : '?' }}
+                </div>
+                
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-semibold text-surface-900 dark:text-surface-0 truncate">
+                        {{ c.usuario.name || 'Sin nombre' }}
+                        <span *ngIf="c.role === 1" class="ml-1 text-xs font-normal text-surface-500">(Tú)</span>
                     </div>
-                    <select [(ngModel)]="selectedRole" class="share-modal__select">
+                    <div class="text-xs text-surface-500 dark:text-surface-400 truncate">{{ c.usuario.email }}</div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <span *ngIf="c.role === 1" class="text-xs font-medium px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 flex items-center gap-1 border border-yellow-200 dark:border-yellow-800">
+                        <i class="pi pi-crown text-[10px]"></i> Propietario
+                    </span>
+                    
+                    <select *ngIf="c.role !== 1" 
+                            [(ngModel)]="c.role" 
+                            class="py-1.5 px-2 rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-900 text-surface-700 dark:text-surface-300 text-xs outline-none cursor-pointer focus:border-yellow-500 disabled:opacity-60 disabled:cursor-not-allowed" 
+                            (change)="updateRole(c)"
+                            [disabled]="!isOwner">
                         <option [value]="2">Editor</option>
                         <option [value]="3">Lector</option>
                     </select>
-                    <button class="share-modal__add-btn" (click)="addCollaborator()" [disabled]="adding() || !emailInput.trim()">
-                        <i class="pi pi-plus" *ngIf="!adding()"></i>
-                        <i class="pi pi-spinner pi-spin" *ngIf="adding()"></i>
-                    </button>
-                </div>
-                <p class="share-modal__error" *ngIf="addError()">{{ addError() }}</p>
-            </div>
 
-            <!-- Collaborator list -->
-            <div class="share-modal__list">
-                <div *ngIf="loading()" class="share-modal__loading">
-                    <i class="pi pi-spinner pi-spin"></i>
-                    <span>Cargando colaboradores...</span>
-                </div>
-
-                <div *ngIf="!loading() && collaborators().length === 0" class="share-modal__empty">
-                    <i class="pi pi-users share-modal__empty-icon"></i>
-                    <p>Solo tú tienes acceso a esta nota</p>
-                </div>
-
-                <div *ngFor="let c of collaborators()" class="share-modal__item">
-                    <div class="share-modal__avatar" [style.background]="avatarColor(c.usuario.name)">
-                        {{ c.usuario.name ? c.usuario.name.charAt(0).toUpperCase() : '?' }}
-                    </div>
-                    <div class="share-modal__info">
-                        <span class="share-modal__name">{{ c.usuario.name || 'Sin nombre' }}</span>
-                        <span class="share-modal__email">{{ c.usuario.email }}</span>
-                    </div>
-                    <div class="share-modal__role-wrap">
-                        <span *ngIf="c.role === 1" class="share-modal__badge share-modal__badge--owner">
-                            <i class="pi pi-crown"></i> Propietario
-                        </span>
-                        <select *ngIf="c.role !== 1" [(ngModel)]="c.role" class="share-modal__role-select" (change)="updateRole(c)">
-                            <option [value]="2">Editor</option>
-                            <option [value]="3">Lector</option>
-                        </select>
-                    </div>
-                    <button *ngIf="c.role !== 1" class="share-modal__remove" (click)="removeCollaborator(c)" title="Eliminar colaborador">
+                    <button *ngIf="c.role !== 1 && isOwner" 
+                            class="w-8 h-8 rounded-full flex items-center justify-center text-surface-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 opacity-0 group-hover:opacity-100 transition-all focus:opacity-100" 
+                            (click)="removeCollaborator(c)" 
+                            title="Eliminar colaborador">
                         <i class="pi pi-times"></i>
                     </button>
                 </div>
             </div>
-
-            <!-- Footer -->
-            <div class="share-modal__footer">
-                <div class="share-modal__legend">
-                    <span class="share-modal__legend-item"><i class="pi pi-crown"></i> Propietario — control total</span>
-                    <span class="share-modal__legend-item"><i class="pi pi-pencil"></i> Editor — puede editar</span>
-                    <span class="share-modal__legend-item"><i class="pi pi-eye"></i> Lector — solo lectura</span>
-                </div>
-                <button class="share-modal__done" (click)="close.emit()">Listo</button>
-            </div>
-
         </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-4 bg-surface-50 dark:bg-surface-800/30 border-t border-surface-200 dark:border-surface-700 flex items-center justify-between">
+            <div class="flex gap-4 text-[11px] text-surface-500 dark:text-surface-400">
+                <span class="flex items-center gap-1"><i class="pi pi-crown text-[10px]"></i> Propietario</span>
+                <span class="flex items-center gap-1"><i class="pi pi-pencil text-[10px]"></i> Editor</span>
+                <span class="flex items-center gap-1"><i class="pi pi-eye text-[10px]"></i> Lector</span>
+            </div>
+            <button class="px-5 py-2 rounded-xl bg-surface-900 dark:bg-surface-0 text-surface-0 dark:text-surface-900 text-sm font-medium hover:bg-surface-800 dark:hover:bg-surface-100 transition-colors shadow-sm" (click)="close.emit()">
+                Listo
+            </button>
+        </div>
+
     </div>
+</div>

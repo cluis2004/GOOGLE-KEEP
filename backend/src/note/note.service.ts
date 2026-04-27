@@ -83,13 +83,44 @@ export class NoteService {
         if (!isNew) {
             const existing = await this.repository.findOneBy({ id: data.id });
             if (!existing) throw new Error(`Entidad con id ${data.id} no encontrado`);
-            await this.repository.update({ id: data.id }, data);
+
+            // Verificar permiso: solo propietario(1) o editor(2) pueden editar
+            if (data.usuario?.id) {
+                const share = await this.noteshareRepository.findOne({
+                    where: { note: { id: data.id }, usuario: { id: data.usuario.id } }
+                });
+
+                if (!share) {
+                    const shareCount = await this.noteshareRepository.count({
+                        where: { note: { id: data.id } }
+                    });
+
+                    if (shareCount === 0) {
+                        await this.noteshareRepository.save(
+                            this.noteshareRepository.create({
+                                role: 1,
+                                note: { id: data.id },
+                                usuario: { id: data.usuario.id }
+                            })
+                        );
+                    } else {
+                        throw new Error('No tienes permiso para editar esta nota.');
+                    }
+                } else if (share.role === 3) {
+                    throw new Error('No tienes permiso para editar esta nota.');
+                }
+            }
+
+            // Evitar sobreescribir campos de relación guardados en el dto
+            const { usuario, ...updateData } = data as any;
+            await this.repository.update({ id: data.id }, updateData);
             return 'Se actualizo correctamente!!!';
         } else {
-            const entity = this.repository.create(data);
+            const { usuario, ...createData } = data;
+            const entity = this.repository.create(createData as Partial<Note>);
             const saved = await this.repository.save(entity);
 
-            // Crear automáticamente el registro de propietario en noteshare
+            // Crear automáticamente el registro de propietario en note_share
             if (data.usuario?.id) {
                 const share = this.noteshareRepository.create({
                     role: 1, // Propietario
@@ -103,10 +134,19 @@ export class NoteService {
         }
     }
 
-    async delete(id: number) {
+    async delete(id: number, userId?: number) {
         const data = await this.findById(id);
         if (!data) throw new Error(`Entidad con id ${id} no encontrado`);
         
+        if (userId) {
+            const share = await this.noteshareRepository.findOne({
+                where: { note: { id }, usuario: { id: userId } }
+            });
+            if (!share || share.role !== 1) {
+                throw new Error('No tienes permiso para eliminar esta nota. Solo el propietario puede hacerlo.');
+            }
+        }
+
         // 1. Eliminar registros de compartición (noteshare)
         await this.noteshareRepository.delete({ note: { id } });
 

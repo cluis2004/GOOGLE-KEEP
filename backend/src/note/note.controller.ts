@@ -1,4 +1,4 @@
-import { Body, Controller, Param, ParseIntPipe, Post } from "@nestjs/common";
+import { Body, Controller, Param, ParseIntPipe, Post, Query } from "@nestjs/common";
 import { NoteService } from "./note.service";
 import { NoteDto } from "./dto/note.dto";
 import { ReorderDto } from "./dto/reorder.dto";
@@ -30,8 +30,9 @@ export class NoteController {
     }
 
     @Post('delete/:id')
-    async delete(@Param('id', ParseIntPipe) id: number) {
-        return await this.service.delete(id);
+    async delete(@Param('id', ParseIntPipe) id: number, @Query('userId') userId?: string) {
+        const uId = userId ? parseInt(userId, 10) : undefined;
+        return await this.service.delete(id, uId);
     }
 
     @Post('duplicate/:id')

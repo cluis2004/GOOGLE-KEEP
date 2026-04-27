@@ -21,6 +21,7 @@ export interface Collaborator {
 })
 export class ShareModalComponent implements OnInit {
     @Input() noteId!: number;
+    @Input() isOwner: boolean = false;
     @Output() close = new EventEmitter<void>();
 
     collaborators = signal<Collaborator[]>([]);

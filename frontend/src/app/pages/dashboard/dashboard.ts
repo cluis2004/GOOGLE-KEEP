@@ -319,6 +319,12 @@ export class Dashboard {
         const isEmptyText = currentNote.type === 'text' && !content;
         const isEmptyList = currentNote.type === 'list' && this.editNoteItems.length === 0;
 
+        // Lector (role=3) solo puede cerrar, no guardar cambios
+        if (currentNote.userRole === 3) {
+            this.closeEditModal();
+            return;
+        }
+
         if (!title && (isEmptyText || isEmptyList)) {
             this.closeEditModal();
             return;
@@ -330,7 +336,8 @@ export class Dashboard {
             id: currentNote.id,
             title: title || 'Sin titulo',
             activo: this.editNoteActivo,
-            type: currentNote.type
+            type: currentNote.type,
+            usuario: this.currentUser ? { id: this.currentUser.id } : undefined
         };
 
         if (currentNote.type === 'list') {
@@ -367,9 +374,12 @@ export class Dashboard {
             return;
         }
 
+        const userId = this.currentUser?.id;
+        if (!userId) return;
+
         this.deleting.set(true);
 
-        this.service.basePost(`notecontroller/delete/${note.id}`, {}).subscribe({
+        this.service.basePost(`notecontroller/delete/${note.id}?userId=${userId}`, {}).subscribe({
             next: () => {
                 this.deleting.set(false);
                 this.openMenuNoteId.set(null);
@@ -388,7 +398,9 @@ export class Dashboard {
 
         this.openMenuNoteId.set(null);
 
-        this.service.basePost(`notecontroller/duplicate/${note.id}`, {}).subscribe({
+        this.service.basePost(`notecontroller/duplicate/${note.id}`, {
+            usuario: this.currentUser ? { id: this.currentUser.id } : undefined
+        }).subscribe({
             next: () => {
                 this.loadNotes(); // Recargar las notas para ver la copia
             },
@@ -399,6 +411,8 @@ export class Dashboard {
     }
 
     toggleItemChecked(note: NoteModel, item: any): void {
+        if (note.userRole === 3) return;
+
         item.checked = !item.checked;
 
         const payload = {
@@ -407,7 +421,8 @@ export class Dashboard {
             content: note.content || '',
             activo: note.activo,
             type: note.type,
-            items: note.items
+            items: note.items,
+            usuario: this.currentUser ? { id: this.currentUser.id } : undefined
         };
 
         // Save to backend immediately
@@ -552,12 +567,23 @@ export class Dashboard {
             if (this.drawingNoteId) {
                 this.uploadAttachment(this.drawingNoteId, formData);
             } else {
-                this.service.basePost('notecontroller/save', { title: 'Dibujo', content: '', activo: true }).subscribe({
-                    next: (res: any) => {
+                const user = this.currentUser;
+                if (!user) {
+                    this.savingDrawing.set(false);
+                    return;
+                }
+
+                this.service.basePost('notecontroller/save', {
+                    title: 'Dibujo',
+                    content: '',
+                    activo: true,
+                    usuario: { id: user.id }
+                }).subscribe({
+                    next: () => {
                         // Recargar notas para obtener la nueva nota que fue la última creada
-                        this.service.basePost('notecontroller/getall', {}).subscribe((notes: NoteModel[]) => {
+                        this.service.basePost(`notecontroller/getbyuser/${user.id}`, {}).subscribe((notes: NoteModel[]) => {
                             if (notes && notes.length > 0) {
-                                // Asumimos que la última nota creada está al final (o buscamos por id maximo)
+                                // Buscar la nota más reciente del usuario actual.
                                 const newNote = notes.reduce((prev, current) => (prev.id > current.id) ? prev : current);
                                 this.uploadAttachment(newNote.id, formData);
                             }
@@ -570,7 +596,10 @@ export class Dashboard {
     }
 
     uploadAttachment(noteId: number, formData: FormData): void {
-        this.service.basePost(`attachment/upload/${noteId}`, formData).subscribe({
+        const userId = this.currentUser?.id;
+        if (!userId) return;
+
+        this.service.basePost(`attachment/upload/${noteId}?userId=${userId}`, formData).subscribe({
             next: () => {
                 this.savingDrawing.set(false);
                 this.closeDrawingModal();
@@ -613,10 +642,21 @@ export class Dashboard {
             if (this.drawingNoteId) {
                 this.uploadAttachment(this.drawingNoteId, formData);
             } else {
+                const user = this.currentUser;
+                if (!user) {
+                    this.savingDrawing.set(false);
+                    return;
+                }
+
                 // Crear nota vacía primero para adjuntar la imagen
-                this.service.basePost('notecontroller/save', { title: 'Imagen adjunta', content: '', activo: true }).subscribe({
+                this.service.basePost('notecontroller/save', {
+                    title: 'Imagen adjunta',
+                    content: '',
+                    activo: true,
+                    usuario: { id: user.id }
+                }).subscribe({
                     next: () => {
-                        this.service.basePost('notecontroller/getall', {}).subscribe((notes: NoteModel[]) => {
+                        this.service.basePost(`notecontroller/getbyuser/${user.id}`, {}).subscribe((notes: NoteModel[]) => {
                             if (notes && notes.length > 0) {
                                 const newNote = notes.reduce((prev, current) => (prev.id > current.id) ? prev : current);
                                 this.uploadAttachment(newNote.id, formData);
@@ -633,7 +673,10 @@ export class Dashboard {
 
     deleteAttachment(attachmentId: number, noteId: number, event?: Event): void {
         event?.stopPropagation();
-        this.service.basePost(`attachment/delete/${attachmentId}`, {}).subscribe({
+        const userId = this.currentUser?.id;
+        if (!userId) return;
+
+        this.service.basePost(`attachment/delete/${attachmentId}?userId=${userId}`, {}).subscribe({
             next: () => {
                 this.loadNotes();
                 
