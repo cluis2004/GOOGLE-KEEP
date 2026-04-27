@@ -19,7 +19,7 @@ export class NoteService {
 
     getAll() {
         return this.repository.find({ 
-            relations: ['attachments'],
+            relations: ['attachments', 'recordatorios'],
             select: {
                 id: true,
                 title: true,
@@ -34,6 +34,10 @@ export class NoteService {
                     id: true,
                     filename: true,
                     filetype: true
+                },
+                recordatorios: {
+                    id: true,
+                    fecha: true
                 }
             },
             order: { order: 'ASC' } 
@@ -48,7 +52,7 @@ export class NoteService {
     async getByUser(userId: number) {
         const shares = await this.noteshareRepository.find({
             where: { usuario: { id: userId } },
-            relations: { note: { attachments: true } },
+            relations: { note: { attachments: true, recordatorios: true } },
             select: {
                 id: true,
                 role: true,
@@ -62,7 +66,8 @@ export class NoteService {
                     items: true,
                     created_at: true,
                     updated_at: true,
-                    attachments: { id: true, filename: true, filetype: true }
+                    attachments: { id: true, filename: true, filetype: true },
+                    recordatorios: { id: true, fecha: true }
                 }
             }
         });

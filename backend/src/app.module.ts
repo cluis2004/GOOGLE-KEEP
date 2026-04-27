@@ -16,6 +16,9 @@ import { NoteShareController } from './noteshare/noteshare.controller';
 import { NoteShareService } from './noteshare/noteshare.service';
 import { NoteController } from './note/note.controller';
 import { NoteService } from './note/note.service';
+import { Recordatorio } from './recordatorio/model/recordatorio.model';
+import { RecordatorioController } from './recordatorio/recordatorio.controller';
+import { RecordatorioService } from './recordatorio/recordatorio.service';
 
 @Module({
   imports: [
@@ -27,21 +30,23 @@ import { NoteService } from './note/note.service';
     TypeOrmModule.forRootAsync({
       useFactory: ormConfig
     }),
-    TypeOrmModule.forFeature([Usuario, Note, Noteshare, Attachment])
+    TypeOrmModule.forFeature([Usuario, Note, Noteshare, Attachment, Recordatorio])
   ],
   controllers: [
     AppController, 
     UsuarioController,
     NoteShareController,
     NoteController,
-    AttachmentController
+    AttachmentController,
+    RecordatorioController
   ],
   providers: [
     // AppService
     UsuarioService,
     NoteShareService,
     NoteService,
-    AttachmentService
+    AttachmentService,
+    RecordatorioService
   ],
 })
 export class AppModule {}

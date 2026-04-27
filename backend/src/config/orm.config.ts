@@ -4,6 +4,7 @@ import { Attachment } from "src/attachment/model/attachment.model";
 import { Note } from "src/note/model/note.model";
 import { Noteshare } from "src/noteshare/model/noteshare.model";
 import { Usuario } from "src/usuario/model/usuario.model";
+import { Recordatorio } from "src/recordatorio/model/recordatorio.model";
 
 export default registerAs(
     'orm.config',
@@ -14,7 +15,7 @@ export default registerAs(
         username: 'sa',
         password: '1844',
         database: 'googlekeep-db',
-        entities: [Usuario, Note, Noteshare, Attachment],
+        entities: [Usuario, Note, Noteshare, Attachment, Recordatorio],
         // Set to true temporarily to create the attachment table and order columns
         synchronize: true,
     }),

@@ -1,4 +1,5 @@
 <section class="pb-8">
+
     <!-- ─── Composer ─────────────────────────────────────────────────────── -->
     <div class="keep-composer mb-8 mx-auto">
         <div class="keep-composer__inner" [class.keep-composer__inner--open]="composerOpen()">
@@ -139,6 +140,28 @@
 
 
 
+            <!-- Reminder chips on card -->
+            <div *ngIf="note.recordatorios?.length" class="keep-card__reminders mt-2" (click)="$event.stopPropagation()">
+                <span
+                    *ngFor="let r of note.recordatorios"
+                    class="keep-reminder-chip"
+                    [class.keep-reminder-chip--upcoming]="hasUpcomingReminder(note)"
+                    [class.keep-reminder-chip--past]="hasPastReminder(note)"
+                >
+                    <i class="pi pi-bell text-[0.6rem]"></i>
+                    {{ r.fecha | date: 'dd/MM/yy HH:mm' }}
+                    <button
+                        type="button"
+                        class="keep-reminder-chip__remove"
+                        (click)="deleteReminder(r.id, note.id, $event)"
+                        [disabled]="deletingReminderId() === r.id"
+                        title="Eliminar recordatorio"
+                    >
+                        <i class="pi pi-times text-[0.5rem]"></i>
+                    </button>
+                </span>
+            </div>
+
             <!-- Footer -->
             <div class="keep-card__footer">
                 <span class="keep-card__date">{{ note.updated_at | date: 'dd/MM/yyyy HH:mm' }}</span>
@@ -147,6 +170,39 @@
                     <button *ngIf="note.userRole === 1" type="button" class="keep-card__menu-btn" title="Compartir" (click)="$event.stopPropagation(); shareModalNoteId.set(note.id)">
                         <i class="pi pi-user-plus text-sm"></i>
                     </button>
+                    <!-- Bell: add reminder -->
+                    <div class="relative" *ngIf="note.userRole !== 3">
+                        <button
+                            type="button"
+                            class="keep-card__menu-btn"
+                            [class.text-amber-500]="note.recordatorios?.length"
+                            title="Recordatorio"
+                            (click)="openReminderPanel(note.id, $event)"
+                        >
+                            <i class="pi pi-bell text-sm"></i>
+                        </button>
+
+                        <!-- Reminder picker popup -->
+                        <div
+                            *ngIf="reminderPanelNoteId() === note.id"
+                            class="keep-reminder-panel"
+                            (click)="$event.stopPropagation()"
+                        >
+                            <p class="text-xs font-semibold text-surface-700 dark:text-surface-200 mb-2">Agregar recordatorio</p>
+                            <input
+                                type="datetime-local"
+                                [(ngModel)]="reminderDateTime"
+                                [min]="minReminderDatetime()"
+                                class="keep-reminder-input"
+                            />
+                            <div class="flex justify-end gap-2 mt-3">
+                                <button type="button" class="keep-reminder-btn keep-reminder-btn--cancel" (click)="closeReminderPanel()">Cancelar</button>
+                                <button type="button" class="keep-reminder-btn keep-reminder-btn--save" [disabled]="savingReminder() || !reminderDateTime" (click)="saveReminder(note.id)">
+                                    {{ savingReminder() ? '...' : 'Guardar' }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                     <button *ngIf="note.userRole !== 3" type="button" class="keep-card__menu-btn" title="Añadir dibujo" (click)="$event.stopPropagation(); openDrawingModal(note.id)">
                         <i class="pi pi-palette text-sm"></i>
                     </button>
@@ -177,6 +233,7 @@
                                 <span>Hacer una copia</span>
                             </button>
                             <button
+                                *ngIf="note.userRole === 1"
                                 type="button"
                                 class="keep-card__dropdown-item keep-card__dropdown-item--danger"
                                 (click)="deleteNote(note, $event)"
@@ -244,6 +301,54 @@
                     (itemsChange)="editNoteItems = $event; onEditChange(false)"
                     (structuralChange)="onEditChange(true)"
                 ></app-checklist>
+            </div>
+
+            <!-- ── Recordatorios en modal ─────────────────────────────────────── -->
+            <div *ngIf="editingNote()?.userRole !== 3" class="px-6 pt-1 pb-3 border-t border-surface-100 dark:border-surface-800">
+                <p class="text-xs font-semibold text-surface-500 dark:text-surface-400 mb-2 flex items-center gap-1">
+                    <i class="pi pi-bell"></i> Recordatorios
+                </p>
+
+                <!-- Lista de recordatorios existentes -->
+                <div *ngIf="editingNote()?.recordatorios?.length" class="flex flex-wrap gap-1.5 mb-2">
+                    <span
+                        *ngFor="let r of editingNote()?.recordatorios"
+                        class="keep-reminder-chip"
+                        [class.keep-reminder-chip--upcoming]="hasUpcomingReminder(editingNote()!)"
+                        [class.keep-reminder-chip--past]="hasPastReminder(editingNote()!)"
+                    >
+                        <i class="pi pi-bell text-[0.6rem]"></i>
+                        {{ r.fecha | date: 'dd MMM yyyy, HH:mm' }}
+                        <button
+                            type="button"
+                            class="keep-reminder-chip__remove"
+                            (click)="deleteReminder(r.id, editingNote()!.id, $event)"
+                            [disabled]="deletingReminderId() === r.id"
+                        >
+                            <i class="pi pi-times text-[0.5rem]"></i>
+                        </button>
+                    </span>
+                </div>
+
+                <!-- Picker inline -->
+                <div class="flex items-center gap-2 flex-wrap">
+                    <input
+                        type="datetime-local"
+                        [(ngModel)]="reminderDateTime"
+                        [min]="minReminderDatetime()"
+                        class="keep-reminder-input"
+                        (click)="$event.stopPropagation()"
+                    />
+                    <button
+                        type="button"
+                        class="keep-reminder-btn keep-reminder-btn--save"
+                        [disabled]="savingReminder() || !reminderDateTime"
+                        (click)="$event.stopPropagation(); saveReminder(editingNote()!.id)"
+                    >
+                        <i class="pi pi-plus text-xs"></i>
+                        {{ savingReminder() ? 'Guardando...' : 'Agregar' }}
+                    </button>
+                </div>
             </div>
 
             <div class="px-6 flex justify-end pb-1">

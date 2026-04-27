@@ -26,7 +26,19 @@ export class AppMenu {
             {
                 label: '',
                 items: [
-                    { label: 'Notas', icon: 'pi pi-fw pi-lightbulb', routerLink: ['/'] }
+                    { 
+                        label: 'Notas', 
+                        icon: 'pi pi-fw pi-lightbulb', 
+                        routerLink: ['/'], 
+                        routerLinkActiveOptions: { paths: 'exact', queryParams: 'exact', matrixParams: 'ignored', fragment: 'ignored' } 
+                    },
+                    { 
+                        label: 'Recordatorios', 
+                        icon: 'pi pi-fw pi-bell', 
+                        routerLink: ['/'], 
+                        queryParams: { filter: 'recordatorios' },
+                        routerLinkActiveOptions: { paths: 'exact', queryParams: 'exact', matrixParams: 'ignored', fragment: 'ignored' } 
+                    }
                 ]
             }
         ];

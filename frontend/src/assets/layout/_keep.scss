@@ -396,3 +396,234 @@ body {
         }
     }
 }
+
+// ─── Reminder Chips ────────────────────────────────────────────────────────
+.keep-card__reminders {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.keep-reminder-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    background-color: #f1f3f4;
+    color: #5f6368;
+    border: 1px solid #dadce0;
+    white-space: nowrap;
+    transition: background-color 0.15s ease;
+
+    &--upcoming {
+        background-color: #e6f4ea;
+        color: #1e7e34;
+        border-color: #a8d5b5;
+    }
+
+    &--past {
+        background-color: #fce8e6;
+        color: #c5221f;
+        border-color: #f5c6c4;
+    }
+
+    &__remove {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 0.9rem;
+        height: 0.9rem;
+        border-radius: 9999px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        color: inherit;
+        padding: 0;
+        transition: background-color 0.12s ease;
+
+        &:hover {
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+
+        &:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+    }
+}
+
+// ─── Reminder Picker Panel (card popup) ────────────────────────────────────
+.keep-reminder-panel {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    right: 0;
+    z-index: 1100;  // above sidebar (999) and modals
+    min-width: 17rem;
+    border-radius: 8px;
+    border: none;
+    background-color: #fff;
+    padding: 1rem;
+    box-shadow: 0 2px 6px 2px rgba(60, 64, 67, 0.15), 0 1px 2px 0 rgba(60, 64, 67, 0.3);
+}
+
+.keep-reminder-input {
+    width: 100%;
+    font-size: 0.8rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #dadce0;
+    border-radius: 6px;
+    outline: none;
+    color: #202124;
+    background-color: #fff;
+    transition: border-color 0.15s ease;
+
+    &:focus {
+        border-color: #1a73e8;
+        box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+    }
+}
+
+.keep-reminder-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.85rem;
+    border-radius: 6px;
+    border: none;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.15s ease, opacity 0.15s ease;
+
+    &:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+
+    &--cancel {
+        background: transparent;
+        color: #5f6368;
+
+        &:hover:not(:disabled) {
+            background-color: #f1f3f4;
+        }
+    }
+
+    &--save {
+        background-color: #1a73e8;
+        color: #fff;
+
+        &:hover:not(:disabled) {
+            background-color: #1765cc;
+        }
+    }
+}
+
+// ─── Dark Mode: Reminders ──────────────────────────────────────────────────
+.app-dark {
+    .keep-reminder-chip {
+        background-color: #3c3f43;
+        color: #9aa0a6;
+        border-color: #5f6368;
+
+        &--upcoming {
+            background-color: #1e3a2b;
+            color: #81c995;
+            border-color: #3d7a52;
+        }
+
+        &--past {
+            background-color: #3b1a1a;
+            color: #f28b82;
+            border-color: #6b2020;
+        }
+
+        &__remove:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+    }
+
+    .keep-reminder-panel {
+        background-color: #2d2e31;
+        box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.4), 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+        border: 1px solid #5f6368;
+    }
+
+    .keep-reminder-input {
+        background-color: #3c3f43;
+        border-color: #5f6368;
+        color: #e8eaed;
+
+        &:focus {
+            border-color: #8ab4f8;
+            box-shadow: 0 0 0 2px rgba(138, 180, 248, 0.2);
+        }
+    }
+
+    .keep-reminder-btn {
+        &--cancel {
+            color: #9aa0a6;
+
+            &:hover:not(:disabled) {
+                background-color: #3c3f43;
+            }
+        }
+
+        &--save {
+            background-color: #8ab4f8;
+            color: #202124;
+
+            &:hover:not(:disabled) {
+                background-color: #aecbfa;
+            }
+        }
+    }
+}
+
+// ─── Reminder Filter Banner ────────────────────────────────────────────────
+.keep-reminder-filter-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.25rem;
+    border-radius: 8px;
+    background-color: #feefc3;
+    border: 1px solid #f9ab00;
+    color: #7d5700;
+
+    &__clear {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.3rem 0.6rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #7d5700;
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+
+        &:hover {
+            background-color: rgba(125, 87, 0, 0.1);
+        }
+    }
+}
+
+.app-dark {
+    .keep-reminder-filter-banner {
+        background-color: #41331c;
+        border-color: #f9ab00;
+        color: #fce8b2;
+
+        &__clear {
+            color: #fce8b2;
+
+            &:hover {
+                background-color: rgba(252, 232, 178, 0.1);
+            }
+        }
+    }
+}

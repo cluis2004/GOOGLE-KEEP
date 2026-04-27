@@ -1,12 +1,18 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal, computed, ElementRef, ViewChild, ViewChildren, QueryList, HostListener, afterNextRender } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { BasicService } from '@/app/service/basic.service';
 import { SearchService } from '@/app/service/search.service';
 import { SessionService } from '@/app/service/session.service';
 import { ChecklistComponent, ChecklistItem } from '@/app/components/checklist/checklist.component';
 import { HistoryManager } from '@/app/service/history.manager';
 import { ShareModalComponent } from '@/app/components/share-modal/share-modal.component';
+
+type Recordatorio = {
+    id: number;
+    fecha: string | Date;
+};
 
 type NoteModel = {
     id: number;
@@ -17,6 +23,7 @@ type NoteModel = {
     type?: string;
     items?: any[];
     attachments?: any[];
+    recordatorios?: Recordatorio[];
     userRole?: number;
     created_at: string | Date;
     updated_at: string | Date;
@@ -25,7 +32,7 @@ type NoteModel = {
 @Component({
     selector: 'app-dashboard',
     standalone: true,
-    imports: [CommonModule, DatePipe, FormsModule, ChecklistComponent, ShareModalComponent],
+    imports: [CommonModule, DatePipe, FormsModule, ChecklistComponent, ShareModalComponent, RouterModule],
     templateUrl: './dashboard.html',
 })
 export class Dashboard {
@@ -42,6 +49,8 @@ export class Dashboard {
     private readonly service = inject(BasicService);
     private readonly searchService = inject(SearchService);
     private readonly sessionService = inject(SessionService);
+    private readonly route = inject(ActivatedRoute);
+    private readonly router = inject(Router);
 
     get currentUser(): { id: number; name: string; email: string } | null {
         const raw = this.sessionService.get();
@@ -50,13 +59,27 @@ export class Dashboard {
 
     notes = signal<NoteModel[]>([]);
 
+    /** true cuando la URL tiene ?filter=recordatorios */
+    showOnlyWithReminders = signal<boolean>(false);
+
     filteredNotes = computed(() => {
         const query = this.searchService.searchQuery().toLowerCase();
-        if (!query) return this.notes();
-        return this.notes().filter(note =>
-            (note.title && note.title.toLowerCase().includes(query)) ||
-            (note.content && note.content.toLowerCase().includes(query))
-        );
+        let list = this.notes();
+
+        // Filtro de recordatorios (sidebar link)
+        if (this.showOnlyWithReminders()) {
+            list = list.filter(n => n.recordatorios && n.recordatorios.length > 0);
+        }
+
+        // Filtro de búsqueda
+        if (query) {
+            list = list.filter(note =>
+                (note.title && note.title.toLowerCase().includes(query)) ||
+                (note.content && note.content.toLowerCase().includes(query))
+            );
+        }
+
+        return list;
     });
 
     loading = signal<boolean>(false);
@@ -95,6 +118,12 @@ export class Dashboard {
     // Share modal
     shareModalNoteId = signal<number | null>(null);
 
+    // ── Recordatorios ──────────────────────────────────────────────────────
+    reminderPanelNoteId = signal<number | null>(null);
+    reminderDateTime = '';
+    savingReminder = signal<boolean>(false);
+    deletingReminderId = signal<number | null>(null);
+
     // Undo / Redo — historial de la nota que se está editando en este momento
     private history = new HistoryManager<{ title: string; content: string; items: ChecklistItem[] }>('keep_edit_history', 15);
     canUndo = this.history.canUndo;
@@ -104,6 +133,11 @@ export class Dashboard {
     constructor() {
         afterNextRender(() => {
             this.loadNotes();
+
+            // Leer query param al cargar y cada vez que cambie
+            this.route.queryParams.subscribe(params => {
+                this.showOnlyWithReminders.set(params['filter'] === 'recordatorios');
+            });
         });
     }
 
@@ -474,7 +508,6 @@ export class Dashboard {
         const newOrder = this.notes().map((n) => n.id);
         this.service.basePost('notecontroller/reorder', { ids: newOrder }).subscribe();
     }
-
     onDragEnd(): void {
         this.draggedNoteId.set(null);
     }
@@ -483,6 +516,7 @@ export class Dashboard {
     closeMenus(): void {
         this.openMenuNoteId.set(null);
         this.showEditMenu.set(false);
+        this.reminderPanelNoteId.set(null);
     }
 
     // --- DRAWING LOGIC ---
@@ -693,5 +727,138 @@ export class Dashboard {
                 alert('No se pudo eliminar la imagen');
             }
         });
+    }
+
+    // ── Recordatorios ──────────────────────────────────────────────────────
+
+    /** Abre el panel de recordatorio para una nota concreta. */
+    openReminderPanel(noteId: number, event: Event): void {
+        event.stopPropagation();
+        if (this.reminderPanelNoteId() === noteId) {
+            this.reminderPanelNoteId.set(null);
+            return;
+        }
+        this.reminderDateTime = this.defaultReminderDatetime();
+        this.reminderPanelNoteId.set(noteId);
+    }
+
+    /** Cierra el panel sin guardar. */
+    closeReminderPanel(): void {
+        this.reminderPanelNoteId.set(null);
+        this.reminderDateTime = '';
+    }
+
+    /** Guarda un nuevo recordatorio. */
+    saveReminder(noteId: number): void {
+        if (!this.reminderDateTime) return;
+        const userId = this.currentUser?.id;
+        this.savingReminder.set(true);
+
+        const url = userId
+            ? `recordatorio/save/${noteId}?userId=${userId}`
+            : `recordatorio/save/${noteId}`;
+
+        this.service.basePost(url, { fecha: new Date(this.reminderDateTime).toISOString() }).subscribe({
+            next: (saved: Recordatorio) => {
+                this.savingReminder.set(false);
+                this.closeReminderPanel();
+
+                // Actualizar la lista local sin recargar todo
+                this.notes.update(list =>
+                    list.map(n => n.id !== noteId ? n : {
+                        ...n,
+                        recordatorios: [...(n.recordatorios ?? []), saved]
+                    })
+                );
+
+                // Sincronizar también la nota en edición si está abierta
+                const editing = this.editingNote();
+                if (editing?.id === noteId) {
+                    this.editingNote.set({
+                        ...editing,
+                        recordatorios: [...(editing.recordatorios ?? []), saved]
+                    });
+                }
+            },
+            error: () => {
+                this.savingReminder.set(false);
+                alert('No se pudo guardar el recordatorio.');
+            }
+        });
+    }
+
+    /** Elimina un recordatorio. */
+    deleteReminder(reminderId: number, noteId: number, event: Event): void {
+        event.stopPropagation();
+        const userId = this.currentUser?.id;
+        this.deletingReminderId.set(reminderId);
+
+        const url = userId
+            ? `recordatorio/delete/${reminderId}?userId=${userId}`
+            : `recordatorio/delete/${reminderId}`;
+
+        this.service.basePost(url, {}).subscribe({
+            next: () => {
+                this.deletingReminderId.set(null);
+
+                // Quitar de la lista local
+                this.notes.update(list =>
+                    list.map(n => n.id !== noteId ? n : {
+                        ...n,
+                        recordatorios: (n.recordatorios ?? []).filter(r => r.id !== reminderId)
+                    })
+                );
+
+                // Sincronizar la nota en edición
+                const editing = this.editingNote();
+                if (editing?.id === noteId) {
+                    this.editingNote.set({
+                        ...editing,
+                        recordatorios: (editing.recordatorios ?? []).filter(r => r.id !== reminderId)
+                    });
+                }
+            },
+            error: () => {
+                this.deletingReminderId.set(null);
+                alert('No se pudo eliminar el recordatorio.');
+            }
+        });
+    }
+
+    /** True si algún recordatorio de la nota está en las próximas 24 h. */
+    hasUpcomingReminder(note: NoteModel): boolean {
+        if (!note.recordatorios?.length) return false;
+        const now = Date.now();
+        const in24h = now + 24 * 60 * 60 * 1000;
+        return note.recordatorios.some(r => {
+            const t = new Date(r.fecha).getTime();
+            return t >= now && t <= in24h;
+        });
+    }
+
+    /** True si algún recordatorio ya venció. */
+    hasPastReminder(note: NoteModel): boolean {
+        if (!note.recordatorios?.length) return false;
+        const now = Date.now();
+        return note.recordatorios.some(r => new Date(r.fecha).getTime() < now);
+    }
+
+    /** Datetime-local mínimo = ahora + 5 min. */
+    minReminderDatetime(): string {
+        const d = new Date(Date.now() + 5 * 60 * 1000);
+        return this.toDatetimeLocal(d);
+    }
+
+    /** Valor por defecto = mañana a las 8 am. */
+    private defaultReminderDatetime(): string {
+        const d = new Date();
+        d.setDate(d.getDate() + 1);
+        d.setHours(8, 0, 0, 0);
+        return this.toDatetimeLocal(d);
+    }
+
+    private toDatetimeLocal(d: Date): string {
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
     }
 }
