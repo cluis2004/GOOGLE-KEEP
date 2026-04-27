@@ -1,0 +1,90 @@
+    <div class="share-backdrop" (click)="close.emit()">
+        <div class="share-modal" (click)="$event.stopPropagation()">
+
+            <!-- Header -->
+            <div class="share-modal__header">
+                <div class="share-modal__icon">
+                    <i class="pi pi-share-alt"></i>
+                </div>
+                <div>
+                    <h2 class="share-modal__title">Compartir nota</h2>
+                    <p class="share-modal__subtitle">Gestiona quién puede ver o editar esta nota</p>
+                </div>
+                <button class="share-modal__close" (click)="close.emit()">
+                    <i class="pi pi-times"></i>
+                </button>
+            </div>
+
+            <!-- Add collaborator -->
+            <div class="share-modal__add">
+                <div class="share-modal__input-row">
+                    <div class="share-modal__input-wrap">
+                        <i class="pi pi-envelope share-modal__input-icon"></i>
+                        <input
+                            type="email"
+                            [(ngModel)]="emailInput"
+                            placeholder="Agregar por correo electrónico"
+                            class="share-modal__input"
+                            (keyup.enter)="addCollaborator()"
+                            [disabled]="adding()"
+                        />
+                    </div>
+                    <select [(ngModel)]="selectedRole" class="share-modal__select">
+                        <option [value]="2">Editor</option>
+                        <option [value]="3">Lector</option>
+                    </select>
+                    <button class="share-modal__add-btn" (click)="addCollaborator()" [disabled]="adding() || !emailInput.trim()">
+                        <i class="pi pi-plus" *ngIf="!adding()"></i>
+                        <i class="pi pi-spinner pi-spin" *ngIf="adding()"></i>
+                    </button>
+                </div>
+                <p class="share-modal__error" *ngIf="addError()">{{ addError() }}</p>
+            </div>
+
+            <!-- Collaborator list -->
+            <div class="share-modal__list">
+                <div *ngIf="loading()" class="share-modal__loading">
+                    <i class="pi pi-spinner pi-spin"></i>
+                    <span>Cargando colaboradores...</span>
+                </div>
+
+                <div *ngIf="!loading() && collaborators().length === 0" class="share-modal__empty">
+                    <i class="pi pi-users share-modal__empty-icon"></i>
+                    <p>Solo tú tienes acceso a esta nota</p>
+                </div>
+
+                <div *ngFor="let c of collaborators()" class="share-modal__item">
+                    <div class="share-modal__avatar" [style.background]="avatarColor(c.usuario.name)">
+                        {{ c.usuario.name ? c.usuario.name.charAt(0).toUpperCase() : '?' }}
+                    </div>
+                    <div class="share-modal__info">
+                        <span class="share-modal__name">{{ c.usuario.name || 'Sin nombre' }}</span>
+                        <span class="share-modal__email">{{ c.usuario.email }}</span>
+                    </div>
+                    <div class="share-modal__role-wrap">
+                        <span *ngIf="c.role === 1" class="share-modal__badge share-modal__badge--owner">
+                            <i class="pi pi-crown"></i> Propietario
+                        </span>
+                        <select *ngIf="c.role !== 1" [(ngModel)]="c.role" class="share-modal__role-select" (change)="updateRole(c)">
+                            <option [value]="2">Editor</option>
+                            <option [value]="3">Lector</option>
+                        </select>
+                    </div>
+                    <button *ngIf="c.role !== 1" class="share-modal__remove" (click)="removeCollaborator(c)" title="Eliminar colaborador">
+                        <i class="pi pi-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="share-modal__footer">
+                <div class="share-modal__legend">
+                    <span class="share-modal__legend-item"><i class="pi pi-crown"></i> Propietario — control total</span>
+                    <span class="share-modal__legend-item"><i class="pi pi-pencil"></i> Editor — puede editar</span>
+                    <span class="share-modal__legend-item"><i class="pi pi-eye"></i> Lector — solo lectura</span>
+                </div>
+                <button class="share-modal__done" (click)="close.emit()">Listo</button>
+            </div>
+
+        </div>
+    </div>

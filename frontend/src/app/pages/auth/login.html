@@ -1,0 +1,56 @@
+<div class="login-page">
+    <div class="login-card">
+
+        <div class="login-card__header">
+            <img src="demo/images/google-keep-icon.webp" alt="Keep" class="login-card__logo" />
+            <h1 class="login-card__title">Keep</h1>
+            <p class="login-card__subtitle">Inicia sesión para continuar</p>
+        </div>
+
+        <div class="login-card__body">
+            <div class="login-field">
+                <label for="email">Correo electrónico</label>
+                <div class="login-field__input-wrap">
+                    <i class="pi pi-envelope"></i>
+                    <input
+                        id="email"
+                        type="email"
+                        [(ngModel)]="email"
+                        placeholder="tu@correo.com"
+                        (keyup)="onKeyEnter($event)"
+                        [disabled]="loading()"
+                        autocomplete="email"
+                    />
+                </div>
+            </div>
+
+            <div class="login-field">
+                <label for="password">Contraseña</label>
+                <div class="login-field__input-wrap">
+                    <i class="pi pi-lock"></i>
+                    <input
+                        id="password"
+                        type="password"
+                        [(ngModel)]="password"
+                        placeholder="••••••••"
+                        (keyup)="onKeyEnter($event)"
+                        [disabled]="loading()"
+                        autocomplete="current-password"
+                    />
+                </div>
+            </div>
+
+            <p class="login-error" *ngIf="error()">
+                <i class="pi pi-exclamation-triangle"></i> {{ error() }}
+            </p>
+
+            <button class="login-btn" (click)="login()" [disabled]="loading()">
+                <span *ngIf="!loading()">Iniciar sesión</span>
+                <span *ngIf="loading()" class="login-btn__loading">
+                    <i class="pi pi-spinner pi-spin"></i> Verificando...
+                </span>
+            </button>
+        </div>
+
+    </div>
+</div>

@@ -1,0 +1,42 @@
+<div class="card">
+    <!-- <h1>Hola mundo</h1>
+
+    <div class="card flex justify-center">
+        <p-datepicker
+        [(ngModel)]="date"
+        />
+    </div> -->
+    
+     <div class="card flex justify-center">
+            <button pButton type="button" (click)="createUsuario()">
+                <i class="pi pi-plus" pButtonIcon></i>
+                <span pButtonLabel>Nuevo</span>
+            </button>
+        </div>
+    <p-table [value]="dataUsuarios()" [tableStyle]="{ 'min-width': '50rem' }">
+        <ng-template #header>
+            <tr>
+                <th>Nombre</th>
+                <th>Email</th>
+                <th>Fecha de Actualizacion</th>
+                <th>Acciones</th>
+            </tr>
+        </ng-template>
+        <ng-template #body let-item>
+            <tr>
+                <td>{{ item.name }}</td>
+                <td>{{ item.email }}</td>
+                <td>{{ item.updated_at | date:'MM/dd/yyyy' }}</td>
+                <td>
+                    <button pButton type="button" (click)="updateUsuario(item)" icon="pi pi-pencil" class="p-button-rounded p-button-text"></button>
+                    <button pButton type="button" (click)="deleteUsuario(item, $event)" icon="pi pi-trash" severity="danger" class="p-button-rounded p-button-text"></button>
+                </td>
+            </tr>
+        </ng-template>
+    </p-table>
+
+    <!-- <p-toast /> -->
+    <p-confirmdialog />
+   <app-usuario (messageEvent)="loadUsuarios()" ></app-usuario> 
+    
+</div>

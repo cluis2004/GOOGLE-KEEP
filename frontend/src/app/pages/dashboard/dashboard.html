@@ -1,0 +1,352 @@
+<section class="pb-8">
+    <!-- ─── Composer ─────────────────────────────────────────────────────── -->
+    <div class="keep-composer mb-8 mx-auto">
+        <div class="keep-composer__inner" [class.keep-composer__inner--open]="composerOpen()">
+
+            <!-- Collapsed row: placeholder + action icons -->
+            <div *ngIf="!composerOpen()" class="flex items-center justify-between px-4 py-3 cursor-text" (click)="openComposer('text')">
+                <span class="text-sm text-surface-500 dark:text-surface-400 select-none">Crear una nota...</span>
+                <div class="flex items-center gap-3" (click)="$event.stopPropagation()">
+                    <button type="button" class="keep-composer__action-btn" (click)="openComposer('list')" title="Nueva lista">
+                        <i class="pi pi-check-square"></i>
+                    </button>
+                    <button type="button" class="keep-composer__action-btn" (click)="openDrawingModal(null)" title="Nueva nota con dibujo">
+                        <i class="pi pi-pencil"></i>
+                    </button>
+                    <button type="button" class="keep-composer__action-btn" (click)="triggerImageUpload(null)" title="Nueva nota con imagen">
+                        <i class="pi pi-image"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Expanded state -->
+            <div *ngIf="composerOpen()" class="px-4 pt-4 pb-2">
+                <!-- Title input -->
+                <input
+                    #newTitleInput
+                    type="text"
+                    [(ngModel)]="newNoteTitle"
+                    (keydown.enter)="onTitleEnter($event, true)"
+                    placeholder="Título"
+                    class="mb-2 w-full border-0 bg-transparent p-0 text-[0.9375rem] font-semibold text-surface-900 outline-none dark:text-surface-0 placeholder:text-surface-500"
+                />
+
+                <!-- Text body -->
+                <textarea
+                    #newContentInput
+                    *ngIf="newNoteType === 'text'"
+                    [(ngModel)]="newNoteContent"
+                    rows="3"
+                    placeholder="Escribe una nota..."
+                    class="w-full resize-none border-0 bg-transparent p-0 text-sm text-surface-700 outline-none placeholder:text-surface-500 dark:text-surface-200 dark:placeholder:text-surface-400"
+                ></textarea>
+
+                <!-- Checklist body -->
+                <app-checklist
+                    *ngIf="newNoteType === 'list'"
+                    [items]="newNoteItems"
+                    [editable]="true"
+                    (itemsChange)="newNoteItems = $event"
+                ></app-checklist>
+
+                <!-- Validation error -->
+                <div *ngIf="composerError()" class="mt-2 text-xs text-red-500">
+                    {{ composerError() }}
+                </div>
+            </div>
+
+            <!-- Expanded footer -->
+            <div *ngIf="composerOpen()" class="flex items-center justify-between px-3 py-2">
+                <div class="flex items-center gap-1 text-surface-500">
+                    <button type="button" class="keep-composer__action-btn" (click)="openComposer('list')" title="Nueva lista">
+                        <i class="pi pi-check-square"></i>
+                    </button>
+                    <button type="button" class="keep-composer__action-btn" (click)="openDrawingModal(null)" title="Añadir dibujo">
+                        <i class="pi pi-pencil"></i>
+                    </button>
+                    <button type="button" class="keep-composer__action-btn" (click)="triggerImageUpload(null)" title="Añadir imagen">
+                        <i class="pi pi-image"></i>
+                    </button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button
+                        type="button"
+                        class="rounded-lg px-4 py-2 text-sm font-medium text-surface-600 hover:bg-surface-100 dark:text-surface-200 dark:hover:bg-surface-800 transition-colors"
+                        (click)="cancelComposer()"
+                    >Cancelar</button>
+                    <button
+                        type="button"
+                        class="rounded-lg bg-surface-900 px-4 py-2 text-sm font-medium text-surface-0 disabled:opacity-60 dark:bg-surface-0 dark:text-surface-900 transition-colors"
+                        [disabled]="saving()"
+                        (click)="createNote()"
+                    >{{ saving() ? 'Guardando...' : 'Guardar' }}</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ─── States ───────────────────────────────────────────────────────── -->
+    <div *ngIf="loading()" class="rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-900 p-6 text-surface-600 dark:text-surface-300">
+        Cargando notas...
+    </div>
+
+    <div *ngIf="error()" class="rounded-2xl border border-red-300 bg-red-50 dark:bg-red-900/20 p-6 text-red-700 dark:text-red-300">
+        {{ error() }}
+    </div>
+
+    <div *ngIf="!loading() && !error() && filteredNotes().length === 0" class="rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-900 p-6 text-surface-600 dark:text-surface-300">
+        No hay notas registradas todavía.
+    </div>
+
+    <!-- ─── Notes Masonry Grid ────────────────────────────────────────────── -->
+    <div *ngIf="!loading() && !error() && filteredNotes().length > 0" class="keep-masonry">
+        <article
+            *ngFor="let note of filteredNotes()"
+            draggable="true"
+            (dragstart)="onDragStart(note)"
+            (dragover)="onDragOver($event)"
+            (drop)="onDrop(note)"
+            (dragend)="onDragEnd()"
+            (click)="openEditModal(note)"
+            class="keep-card group"
+            [class.keep-card--inactive]="!note.activo"
+            [class.keep-card--menu-open]="openMenuNoteId() === note.id"
+        >
+            <!-- Attachments (Edge to edge at top) -->
+            <div *ngIf="note.attachments?.length" class="-mx-4 -mt-[0.875rem] mb-3 w-[calc(100%+2rem)] border-b border-surface-100 dark:border-surface-800 rounded-t-xl overflow-hidden flex flex-col">
+                <img *ngFor="let att of note.attachments" [src]="'http://localhost:3000/api/v1/attachment/view/' + att.id" class="w-full object-cover max-h-60" alt="Attachment" />
+            </div>
+
+            <!-- Header -->
+            <div class="keep-card__header">
+                <h2 class="keep-card__title" *ngIf="note.title && note.title !== 'Sin titulo'">{{ note.title }}</h2>
+                <div class="keep-card__status" [class.keep-card__status--inactive]="!note.activo">
+                    {{ note.activo ? 'Activa' : 'Inactiva' }}
+                </div>
+            </div>
+
+            <!-- Content: text -->
+            <p *ngIf="note.type === 'text' || !note.type" class="keep-card__content whitespace-pre-wrap">{{ note.content }}</p>
+
+            <!-- Content: list -->
+            <app-checklist
+                *ngIf="note.type === 'list' && note.items"
+                [items]="note.items"
+                [editable]="false"
+                (itemToggled)="toggleItemChecked(note, $event)"
+            ></app-checklist>
+
+
+
+            <!-- Footer -->
+            <div class="keep-card__footer">
+                <span class="keep-card__date">{{ note.updated_at | date: 'dd/MM/yyyy HH:mm' }}</span>
+
+                <div class="keep-card__actions opacity-0 transition-opacity duration-150 group-hover:opacity-100 flex items-center gap-1">
+                    <button type="button" class="keep-card__menu-btn" title="Colaborador" (click)="$event.stopPropagation()">
+                        <i class="pi pi-user-plus text-sm"></i>
+                    </button>
+                    <button type="button" class="keep-card__menu-btn" title="Añadir dibujo" (click)="$event.stopPropagation(); openDrawingModal(note.id)">
+                        <i class="pi pi-palette text-sm"></i>
+                    </button>
+                    <button type="button" class="keep-card__menu-btn" title="Añadir imagen" (click)="$event.stopPropagation()">
+                        <i class="pi pi-image text-sm"></i>
+                    </button>
+                    <div class="relative">
+                        <button
+                            type="button"
+                            class="keep-card__menu-btn"
+                            (click)="toggleCardMenu(note.id, $event)"
+                            title="Opciones"
+                        >
+                            <i class="pi pi-ellipsis-v text-sm"></i>
+                        </button>
+
+                        <div
+                            *ngIf="openMenuNoteId() === note.id"
+                            class="keep-card__dropdown"
+                        >
+                            <button
+                                type="button"
+                                class="keep-card__dropdown-item"
+                                (click)="duplicateNote(note, $event)"
+                            >
+                                <i class="pi pi-copy"></i>
+                                <span>Hacer una copia</span>
+                            </button>
+                            <button
+                                type="button"
+                                class="keep-card__dropdown-item keep-card__dropdown-item--danger"
+                                (click)="deleteNote(note, $event)"
+                            >
+                                <i class="pi pi-trash"></i>
+                                <span>Eliminar nota</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </article>
+    </div>
+
+    <!-- ─── Edit Note Modal ───────────────────────────────────────────────── -->
+    <div *ngIf="editingNote()" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4 transition-opacity" (click)="updateNote()">
+        <div class="w-full max-w-2xl rounded-2xl bg-surface-0 shadow-2xl dark:bg-surface-900 flex flex-col relative" (click)="$event.stopPropagation()">
+            
+            <!-- Attachments in Modal -->
+            <div *ngIf="editingNote()?.attachments?.length" class="w-full flex flex-col rounded-t-2xl overflow-hidden border-b border-surface-100 dark:border-surface-800 bg-surface-50 dark:bg-surface-800">
+                <div *ngFor="let att of editingNote()?.attachments" class="relative group w-full">
+                    <img [src]="'http://localhost:3000/api/v1/attachment/view/' + att.id" class="w-full object-contain max-h-[45vh]" alt="Attachment" />
+                    <button type="button" class="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-surface-900/60 hover:bg-surface-900/90 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" (click)="deleteAttachment(att.id, editingNote()!.id, $event)" title="Eliminar imagen">
+                        <i class="pi pi-trash text-sm"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="px-6 pt-5 pb-2">
+                <div class="flex justify-between items-start mb-3">
+                    <input
+                        #editTitleInput
+                        type="text"
+                        [(ngModel)]="editNoteTitle"
+                        (ngModelChange)="onEditChange()"
+                        (keydown.enter)="onTitleEnter($event, false)"
+                        placeholder="Titulo"
+                        class="w-full border-0 bg-transparent p-0 text-xl font-normal text-surface-900 outline-none dark:text-surface-0"
+                    />
+                    <button class="text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200 ml-4">
+                        <i class="pi pi-thumbtack"></i>
+                    </button>
+                </div>
+                <!-- Note Content (Text) -->
+                <textarea
+                    #editContentInput
+                    *ngIf="editingNote()?.type === 'text' || !editingNote()?.type"
+                    [(ngModel)]="editNoteContent"
+                    (ngModelChange)="onEditChange()"
+                    rows="8"
+                    placeholder="Nota"
+                    class="w-full resize-none border-0 bg-transparent p-0 text-[0.95rem] leading-7 text-surface-700 outline-none placeholder:text-surface-500 dark:text-surface-200 dark:placeholder:text-surface-400"
+                ></textarea>
+
+                <!-- Note Content (List) -->
+                <app-checklist
+                    *ngIf="editingNote()?.type === 'list'"
+                    [items]="editNoteItems"
+                    [editable]="true"
+                    (itemsChange)="editNoteItems = $event; onEditChange(false)"
+                    (structuralChange)="onEditChange(true)"
+                ></app-checklist>
+            </div>
+
+            <div class="px-6 flex justify-end pb-1">
+                <span class="text-xs text-surface-500 dark:text-surface-400">Editado: {{ editingNote()?.updated_at | date: 'h:mm a' }}</span>
+            </div>
+
+            <div class="flex items-center justify-between px-4 py-2">
+                <div class="flex items-center gap-1 text-surface-600 dark:text-surface-400 relative">
+                    <button type="button" class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors" (click)="shareModalNoteId.set(editingNote()!.id); $event.stopPropagation()" title="Compartir nota">
+                        <i class="pi pi-user-plus text-sm"></i>
+                    </button>
+                    <button type="button" class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors" (click)="openDrawingModal(editingNote()?.id)">
+                        <i class="pi pi-palette text-sm"></i>
+                    </button>
+                    <button type="button" class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors" (click)="triggerImageUpload(editingNote()?.id)">
+                        <i class="pi pi-image text-sm"></i>
+                    </button>
+                    <!-- Undo -->
+                    <button 
+                        type="button" 
+                        class="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
+                        [class.opacity-30]="!canUndo()"
+                        [class.cursor-not-allowed]="!canUndo()"
+                        [class.hover:bg-surface-100]="canUndo()"
+                        [class.dark:hover:bg-surface-800]="canUndo()"
+                        [disabled]="!canUndo()"
+                        (click)="undo()"
+                        title="Deshacer"
+                    >
+                        <i class="pi pi-arrow-left text-sm"></i>
+                    </button>
+                    <!-- Redo -->
+                    <button 
+                        type="button" 
+                        class="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
+                        [class.opacity-30]="!canRedo()"
+                        [class.cursor-not-allowed]="!canRedo()"
+                        [class.hover:bg-surface-100]="canRedo()"
+                        [class.dark:hover:bg-surface-800]="canRedo()"
+                        [disabled]="!canRedo()"
+                        (click)="redo()"
+                        title="Rehacer"
+                    >
+                        <i class="pi pi-arrow-right text-sm"></i>
+                    </button>
+                    <button type="button" class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors" (click)="toggleEditMenu($event)">
+                        <i class="pi pi-ellipsis-v text-sm"></i>
+                    </button>
+
+                    <div *ngIf="showEditMenu()" class="absolute bottom-10 left-36 z-20 min-w-40 rounded-xl border border-surface-200 bg-surface-0 p-2 shadow-lg dark:border-surface-700 dark:bg-surface-900">
+                        <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-surface-100 dark:text-red-300 dark:hover:bg-surface-800" (click)="deleteEditingNote($event)">
+                            <i class="pi pi-trash"></i>
+                            <span>Eliminar nota</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button
+                        type="button"
+                        class="rounded-md px-5 py-2 text-sm font-medium text-surface-900 hover:bg-surface-100 dark:text-surface-0 dark:hover:bg-surface-800 transition-colors"
+                        [disabled]="savingEdit()"
+                        (click)="updateNote()"
+                    >
+                        {{ savingEdit() ? 'Guardando...' : 'Cerrar' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Drawing Modal ─────────────────────────────────────────────────── -->
+    <div *ngIf="drawingModalOpen()" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 transition-opacity">
+        <div class="w-full max-w-4xl rounded-2xl bg-surface-0 shadow-2xl dark:bg-surface-900 flex flex-col h-[85vh] relative overflow-hidden" (click)="$event.stopPropagation()">
+            <div class="px-4 py-3 flex items-center justify-between border-b border-surface-200 dark:border-surface-700">
+                <h3 class="font-semibold text-surface-900 dark:text-surface-0">Dibujo</h3>
+                <div class="flex items-center gap-3">
+                    <input type="color" [(ngModel)]="drawingColor" (change)="updateCanvasContext()" class="w-8 h-8 rounded cursor-pointer" />
+                    <input type="range" min="1" max="20" [(ngModel)]="drawingLineWidth" (change)="updateCanvasContext()" class="w-24" />
+                    <button type="button" class="px-3 py-1.5 bg-surface-100 hover:bg-surface-200 dark:bg-surface-800 dark:hover:bg-surface-700 rounded-lg text-sm transition-colors" (click)="clearCanvas()">
+                        <i class="pi pi-refresh mr-1"></i> Limpiar
+                    </button>
+                    <button type="button" class="px-4 py-1.5 bg-surface-900 text-surface-0 dark:bg-surface-0 dark:text-surface-900 rounded-lg text-sm font-medium transition-colors" [disabled]="savingDrawing()" (click)="saveDrawing()">
+                        {{ savingDrawing() ? 'Guardando...' : 'Guardar' }}
+                    </button>
+                    <button type="button" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-100 dark:hover:bg-surface-800 text-surface-500 transition-colors ml-1" (click)="closeDrawingModal()">
+                        <i class="pi pi-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="flex-1 relative bg-white cursor-crosshair" #canvasContainer>
+                <canvas
+                    #drawingCanvas
+                    class="absolute top-0 left-0 touch-none"
+                    (mousedown)="startDrawing($event)"
+                    (mousemove)="draw($event)"
+                    (mouseup)="stopDrawing()"
+                    (mouseleave)="stopDrawing()">
+                </canvas>
+            </div>
+        </div>
+    </div>
+    <!-- Hidden File Input for Image Upload -->
+    <input type="file" #imageInput accept="image/*" class="hidden" (change)="onImageSelected($event)" />
+
+    <!-- ─── Share Modal ─────────────────────────────────────────────────── -->
+    <app-share-modal
+        *ngIf="shareModalNoteId() !== null"
+        [noteId]="shareModalNoteId()!"
+        (close)="shareModalNoteId.set(null)"
+    ></app-share-modal>
+
+</section>
